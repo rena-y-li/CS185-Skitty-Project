@@ -1,0 +1,173 @@
+---
+title: "cs185_project_plots"
+output: html_document
+---
+
+```{r}
+gen_test <- read.csv("test_genetic_summary_pure.csv")
+full_test <- read.csv("summary_stats_testing_UNBIASED_F.csv")
+```
+
+
+```{r}
+obs_31 <- full_test %>%
+  filter(run_type == "31_contexts") %>%
+  mutate(
+    R2 = mean_test_r2, 
+    Type = "Accuracy on Real Traits (with Noise)",
+    method = case_when(
+      method == "Context_by_Context" ~ "Context-by-\nContext",
+      method == "Specific_Only"       ~ "Specific\nOnly",
+      method == "Shared_Only"         ~ "Shared\nOnly",
+      method == "Full_Model"          ~ "Full\nModel"
+    ),
+    Label = sprintf("%.3f\n(%d%% success)", R2, round(pct_test_r2_gt0))
+  )
+
+# Plot RHS with calculated R2 values
+
+gen_31 <- gen_test %>%
+  filter(run == "31_contexts") %>%
+  pivot_longer(cols = starts_with("mean_r2_"), names_to = "method_raw", values_to = "R2") %>%
+  mutate(
+    Type = "Accuracy on True Signal (Pure)",
+    pct_sig = case_when(
+      method_raw == "mean_r2_cbc_genetic"      ~ 50,
+      method_raw == "mean_r2_specific_genetic" ~ 48,
+      method_raw == "mean_r2_shared_genetic"   ~ 86,
+      method_raw == "mean_r2_full_genetic"     ~ 59
+    ),
+    method = case_when(
+      method_raw == "mean_r2_cbc_genetic"      ~ "Context-by-\nContext",
+      method_raw == "mean_r2_specific_genetic" ~ "Specific\nOnly",
+      method_raw == "mean_r2_shared_genetic"   ~ "Shared\nOnly",
+      method_raw == "mean_r2_full_genetic"     ~ "Full\nModel"
+    ),
+    Label = sprintf("%.3f\n(%d%% detected)", R2, round(pct_sig))
+  ) %>%
+  select(-method_raw)
+
+
+bind_rows(obs_31, gen_31) %>%
+  mutate(
+    method = factor(method, levels = c("Context-by-\nContext", "Specific\nOnly", "Shared\nOnly", "Full\nModel")),
+    Type = factor(Type, levels = c("Accuracy on Real Traits (with Noise)", "Accuracy on True Signal (Pure)"))
+  ) %>%
+  ggplot(aes(x = method, y = R2, fill = method)) +
+  facet_wrap(~Type, scales = "free_y") + 
+  geom_bar(stat = "identity", width = 0.65, show.legend = FALSE) +
+  geom_errorbar(aes(ymin = R2 - 0.003, ymax = R2 + 0.003), width = 0.1) + 
+  geom_text(aes(y = R2 + 0.003, label = Label), vjust = -0.5, size = 3, lineheight = 0.9) +
+  
+  # Set uniform heights
+  scale_y_continuous(limits = c(0, 0.46), expand = c(0, 0)) + 
+  
+  # Updated labels 
+  labs(
+    title = "CONTENT(Full) Outperforms on Real Data Architecture", 
+    x = "Method", 
+    y = expression("Mean " ~ R^2)
+  ) +
+  
+  theme_classic() + 
+  theme(
+    panel.grid.major = element_line(color = "gray95", size = 0.5),
+    panel.grid.minor = element_line(color = "gray98", size = 0.25),
+    # Bolding removed from all font elements
+    plot.title   = element_text(size = 14, hjust = 0.5, margin = margin(b = 12)), 
+    axis.title   = element_text(size = 12),
+    axis.text.y  = element_text(size = 10),
+    axis.text.x  = element_text(size = 10), 
+    strip.text   = element_text(size = 12)  
+  )
+
+ggsave("performance_plots.png", height = 5, width = 8.5)
+```
+
+```{r}
+# Order the run types
+full_test$run_type <- factor(full_test$run_type,
+                             levels=c("31_contexts","30_contexts",
+                                      "29_contexts","28_contexts"))
+
+# Clean up method names
+full_test$method <- recode(full_test$method,
+                           "Context_by_Context" = "Context-by-Context",
+                           "Full_Model"         = "Full Model",
+                           "Shared_Only"        = "Shared Only",
+                           "Specific_Only"      = "Specific Only")
+full_test$method <- factor(full_test$method,
+                           levels=c("Context-by-Context",
+                                    "Specific Only",
+                                    "Shared Only",
+                                    "Full Model"))
+
+x_labels <- c("31_contexts" = "All contexts",
+              "30_contexts" = "-NK_Proliferating",
+              "29_contexts" = "-NK_Proliferating,\n-NK_CD56bright",
+              "28_contexts" = "-all NK")
+
+drops <- full_test %>%
+  filter(run_type %in% c("31_contexts", "28_contexts")) %>%
+  group_by(method) %>%
+  summarise(
+    pct_drop = round((mean_test_r2[run_type=="31_contexts"] - 
+                      mean_test_r2[run_type=="28_contexts"]) / 
+                      mean_test_r2[run_type=="31_contexts"] * 100, 1),
+    y = mean_test_r2[run_type=="28_contexts"],
+    .groups="drop"
+  )
+
+drops <- drops %>%
+  mutate(nudge = case_when(
+    method == "Full Model"          ~  0.004,
+    method == "Shared Only"         ~ -0.004,
+    method == "Context-by-Context"  ~  0,
+    method == "Specific Only"       ~  0
+  ))
+
+ggplot(full_test, aes(x=run_type, y=mean_test_r2,
+                      color=method, group=method)) +
+  geom_line(linewidth=1) +
+  geom_point(size=3) +
+  # Use sprintf to force exactly three decimal places including trailing zeroes
+  geom_text(data=point_labels,
+            aes(label=sprintf("%.3f", mean_test_r2),
+                vjust=ifelse(method == "Full Model", -2, 2.75)),
+            size=3.5,
+            show.legend=FALSE) +
+  geom_text(data=drops,
+            aes(x="28_contexts", y=y + nudge,
+                label=paste0(pct_drop, "% drop")),
+            hjust=-0.2, size=3.25,
+            color="black",
+            show.legend=FALSE) +
+  scale_x_discrete(labels=x_labels) +
+  scale_color_discrete(breaks=c("Full Model",
+                                "Shared Only",
+                                "Context-by-Context",
+                                "Specific Only")) +
+  scale_y_continuous(limits=c(0.00, 0.11),
+                     expand=expansion(mult=c(0.05, 0.15))) +
+  labs(
+    title = "Mean Test R² Across NK Ablation Runs",
+    x     = "Ablation run",
+    y     = "Mean Test R²",
+    color = "Method"
+  ) +
+  coord_cartesian(clip="off") +
+  theme_classic() +
+  theme(
+    plot.title   = element_text(hjust=0.5, size=14),
+    axis.text.x  = element_text(size=10),
+    axis.title = element_text(size = 12),
+    legend.title = element_text(size=12),
+    legend.text = element_text(size = 11),
+    plot.margin  = margin(r=-40, l=20, t=20, b=30),
+    panel.grid.major = element_line(color = "gray95", linewidth = 0.5),
+    panel.grid.minor = element_line(color = "gray98", linewidth = 0.25),
+    legend.margin = margin(l=10, r= 60)
+  )
+ggsave("ablation.png", width = 9, height = 5)
+```
+
