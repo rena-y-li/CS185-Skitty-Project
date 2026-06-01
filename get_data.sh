@@ -1,7 +1,7 @@
 
 
 
-## getting the scRNA data
+# Getting the scRNA data from website
 
 mkdir expression
 mkdir genotypes
@@ -13,11 +13,11 @@ cd h5ad
 wget -O onek1k.h5ad "https://datasets.cellxgene.cziscience.com/a3f5651f-cd1a-4d26-8165-74964b79b4f2.h5ad"
 
 
-### then run preprocessing, synthetic data generation, and simulating genotypes
+# Get real gencode gene annotation file
 
-
-## generate gene annotation file
 wget https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_46/gencode.v46.annotation.gtf.gz
+
+# Use gencode annotations to create gene_annotation_nochr.tsv file for CONTENT input
 
 zcat gencode.v46.annotation.gtf.gz | \
 grep -v '^#' | \
