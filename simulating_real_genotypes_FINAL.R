@@ -6,22 +6,18 @@
 library(data.table)
 library(MASS)
 
-# ============================================================================
-# PARAMETERS
-# ============================================================================
-
 params <- list(
   n_donors        = 981,
   n_genes         = 1000,
-  snps_per_gene   = 500,     # 500 SNPs strictly within the targeted cis-window
+  snps_per_gene   = 500,     # 500 SNPs each
   h2_shared       = 0.15,    # 15% of expression variance driven by shared genetics
   h2_specific     = 0.05,    # 5% of variance driven by background context variation
-  h2_nk           = 0.10,    # 10% variance spike specifically for NK cells
+  h2_nk           = 0.10,    # 10% variance (heritability) specifically for NK cells
   pi_causal       = 0.05,    # 5% of 500 SNPs = 25 true causal SNPs per gene
   prop_specific   = 0.8,     # 80% of shared causal SNPs also have a context-specific effect
   lambda          = 1,       
   rho             = 0.3,     # 30% environmental correlation between contexts
-  train_frac      = 0.8,
+  train_frac      = 0.8,     # Train test split
   causal_contexts = c("NK", "NK_CD56bright", "NK_Proliferating"),
   seed            = 185
 )
@@ -29,7 +25,7 @@ params <- list(
 set.seed(params$seed)
 
 
-# Load real donor information from pseudobulk matrices
+# Load real donor information from pseudobulk matrices (cell types as contexts)
 
 cat("Loading contexts and donors...\n")
 pb_dir <- "fixed_pseudobulk"
@@ -38,7 +34,7 @@ contexts   <- gsub(".*pseudobulk_int__(.+)\\.tsv\\.gz", "\\1", expr_files)
 n_contexts <- length(contexts)
 cat("Contexts:", n_contexts, "\n")
 
-# Get unique donor IDs across ALL expression files
+# Get unique donor IDs across all expression files
 cat("Extracting all unique donor IDs...\n")
 all_donors_list <- lapply(expr_files, function(f) {
   dt <- fread(f, data.table=FALSE, nrows=1)
@@ -47,7 +43,7 @@ all_donors_list <- lapply(expr_files, function(f) {
 donors <- unique(unlist(all_donors_list))
 n_donors <- length(donors)
 
-
+# Troubleshooting
 if(n_donors != params$n_donors) {
   cat("Note: Found", n_donors, "unique donors, which differs from params$n_donors (", params$n_donors, ")\n")
 } else {
@@ -62,7 +58,7 @@ real_donor_counts <- sapply(expr_files, function(f) {
 })
 names(real_donor_counts) <- contexts
 
-# Validate causal contexts
+# Make sure the causal contexts exist and can be matched
 missing_ctx <- setdiff(params$causal_contexts, contexts)
 if (length(missing_ctx) > 0)
   stop("Causal contexts not found: ", paste(missing_ctx, collapse=", "))
@@ -82,31 +78,34 @@ mask_file <- "empirical_gene_mask.rds"
 if (!file.exists(mask_file)) {
   cat("empirical_gene_mask.rds not found. Generating dynamically from pseudobulk...\n")
   
-  # Load reference file to extract broad list of real candidate Ensembl IDs
+  # Load reference file to get the list of real gene Ensembl IDs
   ref_df <- fread(expr_files[1], data.table=FALSE)
   all_genome_genes <- ref_df$gene_id[!is.na(ref_df$gene_id) & ref_df$gene_id != ""]
   
   if (length(all_genome_genes) < n_genes) {
-    stop("Error: The pseudobulk files contain fewer total genes than required for the simulation.")
+    stop("Error")
   }
   
-  # Select a random subset across chromosomes to prevent localized biological clustering biases
+  # Select a random subset of genes across chromosomes (1000 for this project)
   real_ensembl_ids <- sample(all_genome_genes, n_genes)
   
-  # Initialize mask structure (Rows = generic simulated IDs, Cols = contexts)
+  # Empirical mask structure, all 0's for now (Rows = generic simulated IDs, Cols = contexts)
   mask <- matrix(0, nrow=n_genes, ncol=n_contexts, dimnames=list(gene_ids, contexts))
   
   for (ctx in contexts) {
     ctx_file <- file.path(pb_dir, paste0("pseudobulk_int__", ctx, ".tsv.gz"))
     if (!file.exists(ctx_file)) next
-    
+
+    # Rows are the sampled gene IDs
     df <- fread(ctx_file, data.table=FALSE)
     rownames(df) <- df$gene_id
-    
+
+    # Calculates variance of gene expression across people, if it's 0 it is considered inactive in the cell type
     common_genes <- intersect(real_ensembl_ids, rownames(df))
     gene_vars <- apply(df[common_genes, -1, drop=FALSE], 1, var, na.rm=TRUE)
     active_real_genes <- common_genes[!is.na(gene_vars) & gene_vars > 0]
-    
+
+    # These are the locations of the ensembl genes that are active
     active_indices <- which(real_ensembl_ids %in% active_real_genes)
     active_sim_genes <- gene_ids[active_indices]
     
@@ -114,18 +113,18 @@ if (!file.exists(mask_file)) {
     cat("  Context:", ctx, "| Active genes:", length(active_sim_genes), "/", n_genes, "\n")
   }
   saveRDS(mask, mask_file)
-  cat("Saved biological sparsity map to 'empirical_gene_mask.rds'\n")
+  cat("Saved 'empirical_gene_mask.rds'\n")
 } else {
   cat("Loading existing biological expression mask...\n")
   mask <- readRDS(mask_file)
 }
 
-# Simulate genotypes
-
+# Simulate genotypes with base pair window
 cat("Simulating targeted cis-window genotypes...\n")
 snps_per_gene <- params$snps_per_gene
 window_bp <- 1000000L
 
+# Variable setup
 snp_chrom <- character()
 snp_pos   <- integer()
 snp_ids   <- character()
