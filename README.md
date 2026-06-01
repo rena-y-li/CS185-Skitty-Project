@@ -4,7 +4,8 @@ CONTENT Pipeline Code that covers grabbing the data from the OneK1K cohort and G
 
 Run order: get_data.sh (download Onek1k and gene annotations, then create gene annotation .tsv file) -> make_pseudobulk.py (makes inverted pseudobulk matrices) -> fixing_pseudobulk.py (transposing pseudobulk matrices to correct CONTENT input orientation) -> run_pipeline_FINAL.sh (runs simulating_real_genotypes_FINAL.R to simulate genotype data, then run_content_FINAL.R to run the three CONTENT models and Context-by-Context framework 4 total times, one for the full-context run and once for each of 3 ablation runs, then training_summaries.R, testing_performance.R, testing_summaries.R which corrects errors in testing_performance.R, then genetic_sums.R to summarize and compute statistics for all four models).
 
-AI Use/Disclaimer: Use logs are not available, but the following summarizes AI usage across created code:
+
+## AI Use/Disclaimer: Use logs are not available, but the following summarizes AI usage across created code:
 
 simulating_real_genotypes_FINAL: Gemini was used to understand how to apply reference paper simulation parameters to our simulation when drawing from
 
