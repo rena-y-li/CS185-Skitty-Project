@@ -4,10 +4,12 @@ import pandas as pd
 import glob
 import os
 
+# Create new directory to hold the transposed matrices
 os.makedirs("fixed_pseudobulk", exist_ok=True)
 
 for f in glob.glob("real_pseudobulk/*.tsv.gz"):
 
+    # Read the inverted matrices
     df = pd.read_csv(f, sep="\t", index_col=0)
 
     # Transpose so that the genes become rows
