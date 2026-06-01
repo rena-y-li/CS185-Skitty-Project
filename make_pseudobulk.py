@@ -1,5 +1,6 @@
 
-# This file imports the scRNA-Seq data from the Onek1k cohort and creates pseudobulk matrices to be used during the CONTENT run
+# This file imports the scRNA-Seq data from the Onek1k cohort and creates pseudobulk matrices to be used during the CONTENT run.
+# It creates the matrices in an inverted form, so fixing_pseudobulk.py is necessary to transpose to matrices to the correct orientation.
 
 import scanpy as sc
 import pandas as pd
