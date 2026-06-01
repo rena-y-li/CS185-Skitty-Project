@@ -10,11 +10,15 @@ full_test <- read.csv("summary_stats_testing_UNBIASED_F.csv")
 
 
 ```{r}
+# Filter full data summary statistics to only runs with all 31 contexts
+
 obs_31 <- full_test %>%
   filter(run_type == "31_contexts") %>%
   mutate(
     R2 = mean_test_r2, 
     Type = "Accuracy on Real Traits (with Noise)",
+
+    # Change names to better format
     method = case_when(
       method == "Context_by_Context" ~ "Context-by-\nContext",
       method == "Specific_Only"       ~ "Specific\nOnly",
@@ -24,11 +28,14 @@ obs_31 <- full_test %>%
     Label = sprintf("%.3f\n(%d%% success)", R2, round(pct_test_r2_gt0))
   )
 
-# Plot RHS with calculated R2 values
+# Filter the genetic-only summary statistics to runs with all 31 contexts
 
 gen_31 <- gen_test %>%
   filter(run == "31_contexts") %>%
+
+  # Pivot structure to match the structure of the full_test df
   pivot_longer(cols = starts_with("mean_r2_"), names_to = "method_raw", values_to = "R2") %>%
+  # Add accuracy metric (hardcoded with values manually read from table)
   mutate(
     Type = "Accuracy on True Signal (Pure)",
     pct_sig = case_when(
@@ -37,6 +44,7 @@ gen_31 <- gen_test %>%
       method_raw == "mean_r2_shared_genetic"   ~ 86,
       method_raw == "mean_r2_full_genetic"     ~ 59
     ),
+    # Fix naming
     method = case_when(
       method_raw == "mean_r2_cbc_genetic"      ~ "Context-by-\nContext",
       method_raw == "mean_r2_specific_genetic" ~ "Specific\nOnly",
@@ -47,28 +55,31 @@ gen_31 <- gen_test %>%
   ) %>%
   select(-method_raw)
 
-
+# Merge the two dataframes
 bind_rows(obs_31, gen_31) %>%
+  # Refactor levels for ggplot labeling
   mutate(
     method = factor(method, levels = c("Context-by-\nContext", "Specific\nOnly", "Shared\nOnly", "Full\nModel")),
     Type = factor(Type, levels = c("Accuracy on Real Traits (with Noise)", "Accuracy on True Signal (Pure)"))
   ) %>%
   ggplot(aes(x = method, y = R2, fill = method)) +
+
+  # Create two vertically separated bar graphs
   facet_wrap(~Type, scales = "free_y") + 
   geom_bar(stat = "identity", width = 0.65, show.legend = FALSE) +
-  geom_errorbar(aes(ymin = R2 - 0.003, ymax = R2 + 0.003), width = 0.1) + 
   geom_text(aes(y = R2 + 0.003, label = Label), vjust = -0.5, size = 3, lineheight = 0.9) +
   
   # Set uniform heights
   scale_y_continuous(limits = c(0, 0.46), expand = c(0, 0)) + 
   
-  # Updated labels 
+  # Set labels
   labs(
     title = "CONTENT(Full) Outperforms on Real Data Architecture", 
     x = "Method", 
     y = expression("Mean " ~ R^2)
   ) +
-  
+
+  # Aesthetic alterations
   theme_classic() + 
   theme(
     panel.grid.major = element_line(color = "gray95", size = 0.5),
@@ -90,7 +101,7 @@ full_test$run_type <- factor(full_test$run_type,
                              levels=c("31_contexts","30_contexts",
                                       "29_contexts","28_contexts"))
 
-# Clean up method names
+# Clean up method names and reorder to match graphing order
 full_test$method <- recode(full_test$method,
                            "Context_by_Context" = "Context-by-Context",
                            "Full_Model"         = "Full Model",
@@ -101,12 +112,13 @@ full_test$method <- factor(full_test$method,
                                     "Specific Only",
                                     "Shared Only",
                                     "Full Model"))
-
+# Relabel values to match removal names
 x_labels <- c("31_contexts" = "All contexts",
               "30_contexts" = "-NK_Proliferating",
               "29_contexts" = "-NK_Proliferating,\n-NK_CD56bright",
               "28_contexts" = "-all NK")
 
+# Get the percentage drop from 31 to 28 contexts for each model
 drops <- full_test %>%
   filter(run_type %in% c("31_contexts", "28_contexts")) %>%
   group_by(method) %>%
@@ -118,6 +130,8 @@ drops <- full_test %>%
     .groups="drop"
   )
 
+# Custom moving around of drop labels for the graph
+
 drops <- drops %>%
   mutate(nudge = case_when(
     method == "Full Model"          ~  0.004,
@@ -126,6 +140,7 @@ drops <- drops %>%
     method == "Specific Only"       ~  0
   ))
 
+# Plot dots for each R^2 value and model, connect with lines and add labels
 ggplot(full_test, aes(x=run_type, y=mean_test_r2,
                       color=method, group=method)) +
   geom_line(linewidth=1) +
@@ -155,6 +170,7 @@ ggplot(full_test, aes(x=run_type, y=mean_test_r2,
     y     = "Mean Test R²",
     color = "Method"
   ) +
+# Aesthetic alterations
   coord_cartesian(clip="off") +
   theme_classic() +
   theme(
