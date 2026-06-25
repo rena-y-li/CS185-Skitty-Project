@@ -7,7 +7,7 @@ Run order: get_data.sh (download OneK1K and gene annotations, then create gene a
 
 ### AI Use/Disclaimer: Use logs are not available, but the following summarizes AI usage across created code:
 
-simulating_real_genotypes_FINAL: Gemini was used to understand how to apply reference paper simulation parameters to our simulation when drawing each of the randomly sampled genotypes. It was also used to create a framework for simulation based on most efficient compute order to load and extract information from large gene matrices. It was also used to confirm statistical and biological validity of our simulation methods, help debug the script to replicate original paper results, and create the empirical mask to introduce valid biological sparsity in simulated genotypes.
+simulating_real_genotypes_FINAL: Gemini was used to understand how to apply reference paper simulation parameters to our simulation when drawing each of the randomly sampled genotypes. It was also used to create a framework for simulation based on most efficient compute order to load and extract information from large gene matrices. Finally, Gemini assisted in confirming the statistical and biological validity of our simulation methods, helped debug the script to replicate original paper results, and created the empirical mask to introduce valid biological sparsity in simulated genotypes.
 
 run_content_FINAL.R: Claude was used to make corrections to the script to follow reference paper parameters and procedures more exactly, but most of this script was taken directly from the original CONTENT paper GitHub (https://github.com/cozygene/CONTENT/blob/main/CONTENT_cli.R) with fairly minimal adjustments for naming conventions, parameters, machine core use, progress outputs, etc.
 
